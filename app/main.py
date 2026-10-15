@@ -2,7 +2,6 @@
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from enum import Enum
-from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Query
@@ -11,9 +10,12 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import ConfigDict, model_validator
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 
-# app/main.py -> app/ -> cyberwatch-starter/
-BASE_DIR = Path(__file__).resolve().parent.parent
-DATABASE_URL = "sqlite:///./cyberwatch.db"
+from app.config import BASE_DIR, DATABASE_URL_ENV, resolve_database_url, sqlite_file_path
+
+# 数据库 URL 由 app/config.py 统一解析（优先级：显式参数 > 环境变量 > 项目根绝对路径）。
+# 这样做的目的：让「应用连接的库」与「Alembic 迁移的库」永远是同一个，
+# 且默认路径基于项目根目录、不再随进程 cwd 漂移。
+DATABASE_URL = resolve_database_url()
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 
 
@@ -23,9 +25,20 @@ class Severity(str, Enum):
     high = "high"
 
 
+class Status(str, Enum):
+    """安全事件的生命周期状态。三个值之间**可任意方向切换**（不实现状态机）。"""
+
+    open = "open"
+    investigating = "investigating"
+    resolved = "resolved"
+
+
 class EventBase(SQLModel):
     title: str = Field(min_length=3, max_length=100)
     severity: Severity = Severity.low
+    # default 负责「应用新建事件默认 open」；server_default 负责「迁移时给已有行补 open」，
+    # 并且让 create_all 建出的表与 Alembic 迁移出的表结构完全一致。
+    status: Status = Field(default=Status.open, sa_column_kwargs={"server_default": "open"})
     description: str = Field(default="", max_length=1000)
 
 
@@ -45,6 +58,7 @@ class EventUpdate(SQLModel):
 
     title: str | None = Field(default=None, min_length=3, max_length=100)
     severity: Severity | None = None
+    status: Status | None = None
     description: str | None = Field(default=None, max_length=1000)
 
     @model_validator(mode="before")
@@ -55,6 +69,9 @@ class EventUpdate(SQLModel):
         未提交的字段保持原值（局部更新语义）；显式传 null 会导致
         sqlmodel_update 把 None 写入 NOT NULL 列，commit 时抛 IntegrityError
         变成 HTTP 500。这里提前拦截，统一返回 422。
+
+        注意：这里遍历的是**整个提交体**，不枚举字段名，所以将来新增字段
+        （如 status）会自动获得同样的 null 防护。
         """
         if isinstance(data, dict):
             null_fields = [name for name, value in data.items() if value is None]
@@ -82,8 +99,39 @@ SessionDep = Annotated[Session, Depends(get_session)]
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    SQLModel.metadata.create_all(engine)
+    # 启动时只做**只读**结构检查，绝不修改数据库。
+    # （结构变更的唯一入口是 Alembic：`alembic upgrade head`）
+    ensure_schema_ready()
     yield
+
+
+def ensure_schema_ready() -> None:
+    """只读地确认数据库结构已是最新，否则给出中文操作指引。
+
+    不使用 ``create_all``：它只能建"不存在的表"，永远无法给已有表加列，
+    会与 Alembic 形成双轨（`create_all` 建的表不写 `alembic_version`，
+    之后 `upgrade` 会因为"表已存在"而失败）。因此结构变更一律交给 Alembic。
+    """
+    db_file = sqlite_file_path(DATABASE_URL)
+    if db_file is not None and not db_file.exists():
+        # 先判断文件是否存在，避免连接动作顺手创建一个空库文件。
+        raise RuntimeError(
+            f"数据库文件不存在：{db_file}\n"
+            "请先执行迁移创建结构：\n"
+            "    alembic upgrade head\n"
+            f"（如需改用其它数据库位置，请设置环境变量 {DATABASE_URL_ENV}）"
+        )
+
+    with engine.connect() as connection:
+        columns = [row[1] for row in connection.exec_driver_sql("PRAGMA table_info(event)")]
+
+    if "status" not in columns:
+        raise RuntimeError(
+            "数据库结构不是最新：event 表缺少 status 列。\n"
+            f"当前数据库：{DATABASE_URL}\n"
+            "请先执行迁移：\n"
+            "    alembic upgrade head"
+        )
 
 
 app = FastAPI(title="CyberWatch", version="0.1.0", lifespan=lifespan)
@@ -110,10 +158,16 @@ def create_event(payload: EventCreate, session: SessionDep):
 
 @app.get("/events", response_model=list[EventRead])
 def list_events(session: SessionDep, severity: Severity | None = None,
+                status: Status | None = None,
                 offset: int = Query(default=0, ge=0), limit: int = Query(default=20, ge=1, le=100)):
-    statement = select(Event).order_by(Event.id.desc()).offset(offset).limit(limit)
+    # 每个筛选条件都用链式 .where() 追加，条件之间自动是 AND。
+    # 注意：不要写成「重新 select(Event) 再 where」，那样后一个筛选会覆盖前一个。
+    statement = select(Event)
     if severity:
-        statement = select(Event).where(Event.severity == severity).order_by(Event.id.desc()).offset(offset).limit(limit)
+        statement = statement.where(Event.severity == severity)
+    if status:
+        statement = statement.where(Event.status == status)
+    statement = statement.order_by(Event.id.desc()).offset(offset).limit(limit)
     return session.exec(statement).all()
 
 
