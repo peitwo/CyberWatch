@@ -8,7 +8,7 @@ from typing import Annotated
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import ConfigDict
+from pydantic import ConfigDict, model_validator
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 
 # app/main.py -> app/ -> cyberwatch-starter/
@@ -35,13 +35,35 @@ class Event(EventBase, table=True):
 
 
 class EventCreate(EventBase):
-    pass
+    # 未知字段（通常是拼写错误）直接拒绝，避免字段被静默忽略
+    model_config = ConfigDict(extra="forbid")
 
 
 class EventUpdate(SQLModel):
+    # 同上：拼错字段名返回 422，而不是悄悄跳过
+    model_config = ConfigDict(extra="forbid")
+
     title: str | None = Field(default=None, min_length=3, max_length=100)
     severity: Severity | None = None
     description: str | None = Field(default=None, max_length=1000)
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_explicit_null(cls, data):
+        """区分「字段未提交」与「字段被显式设为 null」。
+
+        未提交的字段保持原值（局部更新语义）；显式传 null 会导致
+        sqlmodel_update 把 None 写入 NOT NULL 列，commit 时抛 IntegrityError
+        变成 HTTP 500。这里提前拦截，统一返回 422。
+        """
+        if isinstance(data, dict):
+            null_fields = [name for name, value in data.items() if value is None]
+            if null_fields:
+                raise ValueError(
+                    "字段 " + "、".join(null_fields)
+                    + " 不能为 null；如需保持原值请省略该字段"
+                )
+        return data
 
 
 class EventRead(EventBase):
