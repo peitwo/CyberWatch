@@ -1,0 +1,68 @@
+/* ===== V0.5.1 登录页样式 =====
+   刻意**不改** dashboard.css 的 :root 变量：登录页直接复用同一套
+   粉色 Kawaii Pastel Pop 配色，只追加本页自己的布局规则。
+   （dashboard.css 已在 HTML 里先引入，本文件后引入即可继承变量。）
+
+   右侧装饰区（.orb / .mascot / .ears / .eyes / .spark）是**两页共用的组件**：
+   凡"长什么样"由 dashboard.css 提供，本文件只写"摆在哪"。
+   分层的原因与踩过的坑见下方 .login-art .mascot 上方注释。 */
+
+.login-body{min-height:100vh;display:grid;place-items:center;background:
+  radial-gradient(circle at 12% 18%,#ffe9f3 0,transparent 45%),
+  radial-gradient(circle at 88% 82%,#efe6ff 0,transparent 45%),
+  var(--background)}
+
+.login-shell{width:min(94vw,940px);display:grid;grid-template-columns:1.05fr .95fr;gap:0;
+  background:var(--white);border:1px solid var(--line);border-radius:28px;
+  box-shadow:var(--shadow);overflow:hidden}
+
+.login-card{padding:clamp(26px,4vw,46px);display:flex;flex-direction:column;gap:16px}
+
+.login-brand{display:flex;align-items:center;gap:12px;margin-bottom:4px}
+
+.login-card h1{margin:2px 0 0;font-size:clamp(22px,3vw,28px);letter-spacing:-.5px}
+.login-card h1 span{color:var(--rose)}
+
+.login-sub{margin:0;color:var(--muted);font-size:13px;line-height:1.7}
+
+.login-card form{display:grid;gap:14px;margin-top:8px}
+.login-card label{display:grid;gap:7px;font-size:12px;font-weight:700;color:#8b7f96}
+.login-card input{padding:12px 14px;border:1px solid #f0e4ee;border-radius:14px;
+  background:#fffafd;color:var(--ink);font-size:14px;transition:border-color .18s,box-shadow .18s}
+.login-card input:focus{outline:none;border-color:var(--rose);box-shadow:0 0 0 3px #fde8f2}
+
+.login-submit{padding:13px 16px;border-radius:15px;font-size:15px;border:none;font-weight:800}
+
+.login-error{margin:0;min-height:16px;font-size:12px;font-weight:700;color:#bb435c}
+.login-error[hidden]{display:none}
+.login-notice{margin:0;font-size:12px;font-weight:700;color:#2f7d5c}
+
+.login-foot{margin:auto 0 0;padding-top:10px;font-size:11px;color:#bdb0c4}
+
+/* 右侧装饰区：复用 dashboard 的粉紫渐变语言，纯装饰、不含信息 */
+.login-art{position:relative;background:linear-gradient(150deg,#ffe1ee 0%,#f3e6ff 55%,#e5f2ff 100%);
+  display:grid;place-items:center;padding:30px}
+/* 圆球：dashboard 的 .orb 几何（inset:7px 20px）已收进 .hero-art 作用域，
+   所以这里就是圆球的唯一定义。作为 grid item 由 place-items:center 居中。 */
+.login-art .orb{width:min(60%,230px);aspect-ratio:1;border-radius:50%;
+  background:radial-gradient(circle at 32% 30%,#fff 0,#ffd3e6 42%,#c9b6ee 100%);
+  box-shadow:0 24px 54px rgba(150,96,140,.24)}
+/* 吉祥物：白脸几何（95×83）、字体排版（.ears 29px / .eyes 24px）、配色
+   全部由 dashboard.css 里的**共享组件**提供，本页只负责"把它摆到 orb 正中央"。
+   刻意不声明 width/height/background/font-size/letter-spacing/font-weight：
+   重复声明就会和共享组件打架 —— 旧版正是漏了 left/top，于是 dashboard 里
+   为 230×160 的 hero-art 写死的 left:80px/top:47px 直接泄漏到本页
+   （脸心偏离球心 33.5px）；而 font-size:20px + letter-spacing:12px 又把
+   「•　ᴗ　•」撑到约 126px（白脸只有 95px），表情被迫折行，末尾那颗腮红
+   掉到白脸下方 14px 之外。改动前的实测数据见 docs/acceptance-v051/mascot-before.json。 */
+.login-art .mascot{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}
+.login-art .spark{position:absolute;color:#fff;text-shadow:0 2px 8px rgba(180,120,170,.5)}
+.login-art .spark.one{top:16%;left:18%;font-size:18px}
+.login-art .spark.two{bottom:20%;right:16%;font-size:22px}
+.login-art .spark.three{bottom:34%;left:24%;font-size:14px}
+
+/* 窄屏：装饰区隐藏、卡片占满，避免 390px 下两栏挤压 */
+@media (max-width:760px){
+  .login-shell{grid-template-columns:1fr}
+  .login-art{display:none}
+}

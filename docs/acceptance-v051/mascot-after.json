@@ -1,0 +1,1295 @@
+{
+  "tag": "after",
+  "base": "http://127.0.0.1:8765",
+  "generatedAt": "2026-10-16T10:10:51.949Z",
+  "cases": [
+    {
+      "scope": "login@390",
+      "page": "login",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "artVisible": false,
+      "checks": [
+        {
+          "name": "装饰区隐藏时无横向溢出",
+          "ok": true,
+          "detail": "scrollWidth=390 innerWidth=390"
+        }
+      ],
+      "measurements": {
+        "url": "/login",
+        "artSelector": "login-art",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "artifact": {
+          "display": "none",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "cx": 0,
+            "cy": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "padding": "30px",
+          "visible": false
+        },
+        "orb": {
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "cx": 0,
+            "cy": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "styles": {
+            "position": "static",
+            "inset": "auto",
+            "left": "auto",
+            "top": "auto",
+            "width": "min(60%, 230px)",
+            "height": "auto",
+            "borderRadius": "50%"
+          },
+          "offsetParent": null
+        },
+        "face": {
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "cx": 0,
+            "cy": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "styles": {
+            "position": "absolute",
+            "left": "50%",
+            "top": "50%",
+            "transform": "none",
+            "width": "95px",
+            "height": "83px",
+            "display": "flex",
+            "flexDirection": "column",
+            "alignItems": "center",
+            "paddingTop": "9px",
+            "fontSize": "16px",
+            "letterSpacing": "normal",
+            "backgroundColor": "rgb(255, 248, 253)"
+          },
+          "offsetParent": null
+        },
+        "eyeGlyphs": [],
+        "mouthGlyphs": [],
+        "lineBoxes": {
+          "eyes": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "cx": 0,
+            "cy": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "mouth": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "cx": 0,
+            "cy": 0,
+            "right": 0,
+            "bottom": 0
+          }
+        },
+        "mascotMarkup": {
+          "childCount": 2,
+          "className": "mascot",
+          "firstChildClass": "ears",
+          "secondChildClass": "eyes",
+          "usesSharedClasses": true
+        },
+        "sparks": [
+          {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "cx": 0,
+            "cy": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "cx": 0,
+            "cy": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "cx": 0,
+            "cy": 0,
+            "right": 0,
+            "bottom": 0
+          }
+        ],
+        "overflow": {
+          "docScrollWidth": 390,
+          "bodyScrollWidth": 390,
+          "innerWidth": 390,
+          "horizontal": false
+        }
+      },
+      "screenshot": "docs/acceptance-v051/mascot-after-login-390.png"
+    },
+    {
+      "scope": "dashboard@390",
+      "page": "dashboard",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "artVisible": false,
+      "checks": [
+        {
+          "name": "装饰区隐藏时无横向溢出",
+          "ok": true,
+          "detail": "scrollWidth=390 innerWidth=390"
+        }
+      ],
+      "measurements": {
+        "url": "/dashboard",
+        "artSelector": "hero-art",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "artifact": {
+          "display": "none",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "cx": 0,
+            "cy": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "padding": "0px",
+          "visible": false
+        },
+        "orb": {
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "cx": 0,
+            "cy": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "styles": {
+            "position": "absolute",
+            "inset": "7px 20px",
+            "left": "20px",
+            "top": "7px",
+            "width": "auto",
+            "height": "auto",
+            "borderRadius": "45%"
+          },
+          "offsetParent": null
+        },
+        "face": {
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "cx": 0,
+            "cy": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "styles": {
+            "position": "absolute",
+            "left": "35px",
+            "top": "47px",
+            "transform": "none",
+            "width": "95px",
+            "height": "83px",
+            "display": "flex",
+            "flexDirection": "column",
+            "alignItems": "center",
+            "paddingTop": "9px",
+            "fontSize": "16px",
+            "letterSpacing": "normal",
+            "backgroundColor": "rgb(255, 248, 253)"
+          },
+          "offsetParent": null
+        },
+        "eyeGlyphs": [],
+        "mouthGlyphs": [],
+        "lineBoxes": {
+          "eyes": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "cx": 0,
+            "cy": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "mouth": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "cx": 0,
+            "cy": 0,
+            "right": 0,
+            "bottom": 0
+          }
+        },
+        "mascotMarkup": {
+          "childCount": 2,
+          "className": "mascot",
+          "firstChildClass": "ears",
+          "secondChildClass": "eyes",
+          "usesSharedClasses": true
+        },
+        "sparks": [
+          {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "cx": 0,
+            "cy": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "cx": 0,
+            "cy": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "cx": 0,
+            "cy": 0,
+            "right": 0,
+            "bottom": 0
+          }
+        ],
+        "overflow": {
+          "docScrollWidth": 390,
+          "bodyScrollWidth": 390,
+          "innerWidth": 390,
+          "horizontal": false
+        }
+      },
+      "screenshot": "docs/acceptance-v051/mascot-after-dashboard-390.png"
+    },
+    {
+      "scope": "login@720",
+      "page": "login",
+      "viewport": {
+        "width": 720,
+        "height": 1024
+      },
+      "artVisible": false,
+      "checks": [
+        {
+          "name": "装饰区隐藏时无横向溢出",
+          "ok": true,
+          "detail": "scrollWidth=720 innerWidth=720"
+        }
+      ],
+      "measurements": {
+        "url": "/login",
+        "artSelector": "login-art",
+        "viewport": {
+          "width": 720,
+          "height": 1024
+        },
+        "artifact": {
+          "display": "none",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "cx": 0,
+            "cy": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "padding": "30px",
+          "visible": false
+        },
+        "orb": {
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "cx": 0,
+            "cy": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "styles": {
+            "position": "static",
+            "inset": "auto",
+            "left": "auto",
+            "top": "auto",
+            "width": "min(60%, 230px)",
+            "height": "auto",
+            "borderRadius": "50%"
+          },
+          "offsetParent": null
+        },
+        "face": {
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "cx": 0,
+            "cy": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "styles": {
+            "position": "absolute",
+            "left": "50%",
+            "top": "50%",
+            "transform": "none",
+            "width": "95px",
+            "height": "83px",
+            "display": "flex",
+            "flexDirection": "column",
+            "alignItems": "center",
+            "paddingTop": "9px",
+            "fontSize": "16px",
+            "letterSpacing": "normal",
+            "backgroundColor": "rgb(255, 248, 253)"
+          },
+          "offsetParent": null
+        },
+        "eyeGlyphs": [],
+        "mouthGlyphs": [],
+        "lineBoxes": {
+          "eyes": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "cx": 0,
+            "cy": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "mouth": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "cx": 0,
+            "cy": 0,
+            "right": 0,
+            "bottom": 0
+          }
+        },
+        "mascotMarkup": {
+          "childCount": 2,
+          "className": "mascot",
+          "firstChildClass": "ears",
+          "secondChildClass": "eyes",
+          "usesSharedClasses": true
+        },
+        "sparks": [
+          {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "cx": 0,
+            "cy": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "cx": 0,
+            "cy": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "cx": 0,
+            "cy": 0,
+            "right": 0,
+            "bottom": 0
+          }
+        ],
+        "overflow": {
+          "docScrollWidth": 720,
+          "bodyScrollWidth": 720,
+          "innerWidth": 720,
+          "horizontal": false
+        }
+      },
+      "screenshot": "docs/acceptance-v051/mascot-after-login-720.png"
+    },
+    {
+      "scope": "dashboard@720",
+      "page": "dashboard",
+      "viewport": {
+        "width": 720,
+        "height": 1024
+      },
+      "artVisible": false,
+      "checks": [
+        {
+          "name": "装饰区隐藏时无横向溢出",
+          "ok": true,
+          "detail": "scrollWidth=720 innerWidth=720"
+        }
+      ],
+      "measurements": {
+        "url": "/dashboard",
+        "artSelector": "hero-art",
+        "viewport": {
+          "width": 720,
+          "height": 1024
+        },
+        "artifact": {
+          "display": "none",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "cx": 0,
+            "cy": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "padding": "0px",
+          "visible": false
+        },
+        "orb": {
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "cx": 0,
+            "cy": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "styles": {
+            "position": "absolute",
+            "inset": "7px 20px",
+            "left": "20px",
+            "top": "7px",
+            "width": "auto",
+            "height": "auto",
+            "borderRadius": "45%"
+          },
+          "offsetParent": null
+        },
+        "face": {
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "cx": 0,
+            "cy": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "styles": {
+            "position": "absolute",
+            "left": "35px",
+            "top": "47px",
+            "transform": "none",
+            "width": "95px",
+            "height": "83px",
+            "display": "flex",
+            "flexDirection": "column",
+            "alignItems": "center",
+            "paddingTop": "9px",
+            "fontSize": "16px",
+            "letterSpacing": "normal",
+            "backgroundColor": "rgb(255, 248, 253)"
+          },
+          "offsetParent": null
+        },
+        "eyeGlyphs": [],
+        "mouthGlyphs": [],
+        "lineBoxes": {
+          "eyes": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "cx": 0,
+            "cy": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "mouth": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "cx": 0,
+            "cy": 0,
+            "right": 0,
+            "bottom": 0
+          }
+        },
+        "mascotMarkup": {
+          "childCount": 2,
+          "className": "mascot",
+          "firstChildClass": "ears",
+          "secondChildClass": "eyes",
+          "usesSharedClasses": true
+        },
+        "sparks": [
+          {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "cx": 0,
+            "cy": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "cx": 0,
+            "cy": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "cx": 0,
+            "cy": 0,
+            "right": 0,
+            "bottom": 0
+          }
+        ],
+        "overflow": {
+          "docScrollWidth": 720,
+          "bodyScrollWidth": 720,
+          "innerWidth": 720,
+          "horizontal": false
+        }
+      },
+      "screenshot": "docs/acceptance-v051/mascot-after-dashboard-720.png"
+    },
+    {
+      "scope": "login@1440",
+      "page": "login",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "artVisible": true,
+      "checks": [
+        {
+          "name": "存在白脸与 orb",
+          "ok": true,
+          "detail": "face=true orb=true"
+        },
+        {
+          "name": "白脸完全位于 orb 内",
+          "ok": true,
+          "detail": "face=[918.7,408.5,1013.7,491.5] orb=[851.2,335,1081.2,565]"
+        },
+        {
+          "name": "白脸中心与 orb 中心重合",
+          "ok": true,
+          "detail": "Δ=(0, 0)"
+        },
+        {
+          "name": "字形总数 = 5（2 眼 + 2 腮红 + 1 嘴）",
+          "ok": true,
+          "detail": "实际取到 5 个字形（◠◠•ᴗ•）"
+        },
+        {
+          "name": "「眼睛」整行落在白脸内",
+          "ok": true,
+          "detail": "行=[x926.89 y417.5 → 1005.52,446.5] 脸=[x918.7 y408.5 → 1013.7,491.5]"
+        },
+        {
+          "name": "「嘴巴+腮红」整行落在白脸内",
+          "ok": true,
+          "detail": "行=[x925.31 y451.5 → 1007.09,483.5] 脸=[x918.7 y408.5 → 1013.7,491.5]"
+        },
+        {
+          "name": "全部字形都在白脸范围内",
+          "ok": true,
+          "detail": "5 个字形全部在脸内"
+        },
+        {
+          "name": "眼睛是两个字形",
+          "ok": true,
+          "detail": "找到 2 个「◠」"
+        },
+        {
+          "name": "眼睛左右对称（相对于脸心等距）",
+          "ok": true,
+          "detail": "左 26.9px / 右 26.9px（差 0.00px）"
+        },
+        {
+          "name": "双眼中点与脸心重合",
+          "ok": true,
+          "detail": "中点偏移 0px"
+        },
+        {
+          "name": "双眼同高",
+          "ok": true,
+          "detail": "Δy=0.00px"
+        },
+        {
+          "name": "找到嘴巴字形「ᴗ」",
+          "ok": true,
+          "detail": "cx=966.2"
+        },
+        {
+          "name": "嘴巴水平居中于白脸",
+          "ok": true,
+          "detail": "偏移 0px（脸心 966.2）"
+        },
+        {
+          "name": "腮红是两个字形",
+          "ok": true,
+          "detail": "找到 2 个「•」"
+        },
+        {
+          "name": "腮红左右对称（相对于脸心等距）",
+          "ok": true,
+          "detail": "左 36.01px / 右 36.01px（差 0.00px）"
+        },
+        {
+          "name": "腮红中点与脸心重合",
+          "ok": true,
+          "detail": "中点偏移 0px"
+        },
+        {
+          "name": "腮红在白脸范围内",
+          "ok": true,
+          "detail": "左 right=935.06 脸 right=1013.7；右 x=997.33 脸 x=918.7"
+        },
+        {
+          "name": "腮红与嘴巴同高（同一行）",
+          "ok": true,
+          "detail": "Δy=0.00px"
+        },
+        {
+          "name": "嘴巴位于两腮红之间",
+          "ok": true,
+          "detail": "嘴 966.2 ∈ (930.19, 1002.21)"
+        },
+        {
+          "name": "无横向溢出",
+          "ok": true,
+          "detail": "scrollWidth=1440 innerWidth=1440"
+        },
+        {
+          "name": "白脸定位上下文是装饰区",
+          "ok": true,
+          "detail": "offsetParent=.login-art art=login-art"
+        }
+      ],
+      "measurements": {
+        "url": "/login",
+        "artSelector": "login-art",
+        "viewport": {
+          "width": 1440,
+          "height": 900
+        },
+        "artifact": {
+          "display": "grid",
+          "rect": {
+            "x": 743.44,
+            "y": 182.91,
+            "w": 445.55,
+            "h": 534.19,
+            "cx": 966.21,
+            "cy": 450,
+            "right": 1188.98,
+            "bottom": 717.09
+          },
+          "padding": "30px",
+          "visible": true
+        },
+        "orb": {
+          "rect": {
+            "x": 851.2,
+            "y": 335,
+            "w": 230,
+            "h": 230,
+            "cx": 966.2,
+            "cy": 450,
+            "right": 1081.2,
+            "bottom": 565
+          },
+          "styles": {
+            "position": "static",
+            "inset": "auto",
+            "left": "auto",
+            "top": "auto",
+            "width": "230px",
+            "height": "230px",
+            "borderRadius": "50%"
+          },
+          "offsetParent": ".login-art"
+        },
+        "face": {
+          "rect": {
+            "x": 918.7,
+            "y": 408.5,
+            "w": 95,
+            "h": 83,
+            "cx": 966.2,
+            "cy": 450,
+            "right": 1013.7,
+            "bottom": 491.5
+          },
+          "styles": {
+            "position": "absolute",
+            "left": "222.766px",
+            "top": "267.094px",
+            "transform": "matrix(1, 0, 0, 1, -47.5, -41.5)",
+            "width": "95px",
+            "height": "83px",
+            "display": "flex",
+            "flexDirection": "column",
+            "alignItems": "center",
+            "paddingTop": "9px",
+            "fontSize": "16px",
+            "letterSpacing": "normal",
+            "backgroundColor": "rgb(255, 248, 253)"
+          },
+          "offsetParent": ".login-art"
+        },
+        "eyeGlyphs": [
+          {
+            "char": "◠",
+            "index": 0,
+            "x": 926.89,
+            "y": 412.5,
+            "w": 24.81,
+            "h": 38,
+            "cx": 939.3,
+            "cy": 431.5,
+            "right": 951.7,
+            "bottom": 450.5
+          },
+          {
+            "char": "◠",
+            "index": 2,
+            "x": 980.69,
+            "y": 412.5,
+            "w": 24.83,
+            "h": 38,
+            "cx": 993.1,
+            "cy": 431.5,
+            "right": 1005.52,
+            "bottom": 450.5
+          }
+        ],
+        "mouthGlyphs": [
+          {
+            "char": "•",
+            "index": 0,
+            "x": 925.31,
+            "y": 451.5,
+            "w": 9.75,
+            "h": 32,
+            "cx": 930.19,
+            "cy": 467.5,
+            "right": 935.06,
+            "bottom": 483.5
+          },
+          {
+            "char": "ᴗ",
+            "index": 2,
+            "x": 959.06,
+            "y": 451.5,
+            "w": 14.28,
+            "h": 32,
+            "cx": 966.2,
+            "cy": 467.5,
+            "right": 973.34,
+            "bottom": 483.5
+          },
+          {
+            "char": "•",
+            "index": 4,
+            "x": 997.33,
+            "y": 451.5,
+            "w": 9.77,
+            "h": 32,
+            "cx": 1002.21,
+            "cy": 467.5,
+            "right": 1007.09,
+            "bottom": 483.5
+          }
+        ],
+        "lineBoxes": {
+          "eyes": {
+            "x": 926.89,
+            "y": 417.5,
+            "w": 78.63,
+            "h": 29,
+            "cx": 966.2,
+            "cy": 432,
+            "right": 1005.52,
+            "bottom": 446.5
+          },
+          "mouth": {
+            "x": 925.31,
+            "y": 451.5,
+            "w": 81.78,
+            "h": 32,
+            "cx": 966.2,
+            "cy": 467.5,
+            "right": 1007.09,
+            "bottom": 483.5
+          }
+        },
+        "mascotMarkup": {
+          "childCount": 2,
+          "className": "mascot",
+          "firstChildClass": "ears",
+          "secondChildClass": "eyes",
+          "usesSharedClasses": true
+        },
+        "sparks": [
+          {
+            "x": 823.63,
+            "y": 268.38,
+            "w": 14.69,
+            "h": 24,
+            "cx": 830.97,
+            "cy": 280.38,
+            "right": 838.31,
+            "bottom": 292.38
+          },
+          {
+            "x": 1099.75,
+            "y": 580.27,
+            "w": 17.95,
+            "h": 30,
+            "cx": 1108.73,
+            "cy": 595.27,
+            "right": 1117.7,
+            "bottom": 610.27
+          },
+          {
+            "x": 850.36,
+            "y": 516.48,
+            "w": 11.44,
+            "h": 19,
+            "cx": 856.08,
+            "cy": 525.98,
+            "right": 861.8,
+            "bottom": 535.48
+          }
+        ],
+        "overflow": {
+          "docScrollWidth": 1440,
+          "bodyScrollWidth": 1440,
+          "innerWidth": 1440,
+          "horizontal": false
+        }
+      },
+      "faceCenterDelta": [
+        0,
+        0
+      ],
+      "screenshot": "docs/acceptance-v051/mascot-after-login-1440.png"
+    },
+    {
+      "scope": "dashboard@1440",
+      "page": "dashboard",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "artVisible": true,
+      "checks": [
+        {
+          "name": "存在白脸与 orb",
+          "ok": true,
+          "detail": "face=true orb=true"
+        },
+        {
+          "name": "白脸完全位于 orb 内",
+          "ok": true,
+          "detail": "face=[1188.41,184,1283.41,267] orb=[1128.41,144,1318.41,290]"
+        },
+        {
+          "name": "Dashboard 白脸仍在 orb 内（构图偏移属既有设计）",
+          "ok": true,
+          "detail": "Δ=(12.5, 8.5)"
+        },
+        {
+          "name": "字形总数 = 5（2 眼 + 2 腮红 + 1 嘴）",
+          "ok": true,
+          "detail": "实际取到 5 个字形（◠◠•ᴗ•）"
+        },
+        {
+          "name": "「眼睛」整行落在白脸内",
+          "ok": true,
+          "detail": "行=[x1196.59 y193 → 1275.22,222] 脸=[x1188.41 y184 → 1283.41,267]"
+        },
+        {
+          "name": "「嘴巴+腮红」整行落在白脸内",
+          "ok": true,
+          "detail": "行=[x1195.02 y227 → 1276.8,259] 脸=[x1188.41 y184 → 1283.41,267]"
+        },
+        {
+          "name": "全部字形都在白脸范围内",
+          "ok": true,
+          "detail": "5 个字形全部在脸内"
+        },
+        {
+          "name": "眼睛是两个字形",
+          "ok": true,
+          "detail": "找到 2 个「◠」"
+        },
+        {
+          "name": "眼睛左右对称（相对于脸心等距）",
+          "ok": true,
+          "detail": "左 26.91px / 右 26.89px（差 0.02px）"
+        },
+        {
+          "name": "双眼中点与脸心重合",
+          "ok": true,
+          "detail": "中点偏移 -0.01px"
+        },
+        {
+          "name": "双眼同高",
+          "ok": true,
+          "detail": "Δy=0.00px"
+        },
+        {
+          "name": "找到嘴巴字形「ᴗ」",
+          "ok": true,
+          "detail": "cx=1235.91"
+        },
+        {
+          "name": "嘴巴水平居中于白脸",
+          "ok": true,
+          "detail": "偏移 0px（脸心 1235.91）"
+        },
+        {
+          "name": "腮红是两个字形",
+          "ok": true,
+          "detail": "找到 2 个「•」"
+        },
+        {
+          "name": "腮红左右对称（相对于脸心等距）",
+          "ok": true,
+          "detail": "左 36.02px / 右 36px（差 0.02px）"
+        },
+        {
+          "name": "腮红中点与脸心重合",
+          "ok": true,
+          "detail": "中点偏移 -0.01px"
+        },
+        {
+          "name": "腮红在白脸范围内",
+          "ok": true,
+          "detail": "左 right=1204.77 脸 right=1283.41；右 x=1267.03 脸 x=1188.41"
+        },
+        {
+          "name": "腮红与嘴巴同高（同一行）",
+          "ok": true,
+          "detail": "Δy=0.00px"
+        },
+        {
+          "name": "嘴巴位于两腮红之间",
+          "ok": true,
+          "detail": "嘴 1235.91 ∈ (1199.89, 1271.91)"
+        },
+        {
+          "name": "无横向溢出",
+          "ok": true,
+          "detail": "scrollWidth=1440 innerWidth=1440"
+        },
+        {
+          "name": "白脸定位上下文是装饰区",
+          "ok": true,
+          "detail": "offsetParent=.hero-art art=hero-art"
+        }
+      ],
+      "measurements": {
+        "url": "/dashboard",
+        "artSelector": "hero-art",
+        "viewport": {
+          "width": 1440,
+          "height": 900
+        },
+        "artifact": {
+          "display": "block",
+          "rect": {
+            "x": 1108.41,
+            "y": 137,
+            "w": 230,
+            "h": 160,
+            "cx": 1223.41,
+            "cy": 217,
+            "right": 1338.41,
+            "bottom": 297
+          },
+          "padding": "0px",
+          "visible": true
+        },
+        "orb": {
+          "rect": {
+            "x": 1128.41,
+            "y": 144,
+            "w": 190,
+            "h": 146,
+            "cx": 1223.41,
+            "cy": 217,
+            "right": 1318.41,
+            "bottom": 290
+          },
+          "styles": {
+            "position": "absolute",
+            "inset": "7px 20px",
+            "left": "20px",
+            "top": "7px",
+            "width": "190px",
+            "height": "146px",
+            "borderRadius": "45%"
+          },
+          "offsetParent": ".hero-art"
+        },
+        "face": {
+          "rect": {
+            "x": 1188.41,
+            "y": 184,
+            "w": 95,
+            "h": 83,
+            "cx": 1235.91,
+            "cy": 225.5,
+            "right": 1283.41,
+            "bottom": 267
+          },
+          "styles": {
+            "position": "absolute",
+            "left": "80px",
+            "top": "47px",
+            "transform": "none",
+            "width": "95px",
+            "height": "83px",
+            "display": "flex",
+            "flexDirection": "column",
+            "alignItems": "center",
+            "paddingTop": "9px",
+            "fontSize": "16px",
+            "letterSpacing": "normal",
+            "backgroundColor": "rgb(255, 248, 253)"
+          },
+          "offsetParent": ".hero-art"
+        },
+        "eyeGlyphs": [
+          {
+            "char": "◠",
+            "index": 0,
+            "x": 1196.59,
+            "y": 188,
+            "w": 24.81,
+            "h": 38,
+            "cx": 1209,
+            "cy": 207,
+            "right": 1221.41,
+            "bottom": 226
+          },
+          {
+            "char": "◠",
+            "index": 2,
+            "x": 1250.39,
+            "y": 188,
+            "w": 24.83,
+            "h": 38,
+            "cx": 1262.8,
+            "cy": 207,
+            "right": 1275.22,
+            "bottom": 226
+          }
+        ],
+        "mouthGlyphs": [
+          {
+            "char": "•",
+            "index": 0,
+            "x": 1195.02,
+            "y": 227,
+            "w": 9.75,
+            "h": 32,
+            "cx": 1199.89,
+            "cy": 243,
+            "right": 1204.77,
+            "bottom": 259
+          },
+          {
+            "char": "ᴗ",
+            "index": 2,
+            "x": 1228.77,
+            "y": 227,
+            "w": 14.28,
+            "h": 32,
+            "cx": 1235.91,
+            "cy": 243,
+            "right": 1243.05,
+            "bottom": 259
+          },
+          {
+            "char": "•",
+            "index": 4,
+            "x": 1267.03,
+            "y": 227,
+            "w": 9.77,
+            "h": 32,
+            "cx": 1271.91,
+            "cy": 243,
+            "right": 1276.8,
+            "bottom": 259
+          }
+        ],
+        "lineBoxes": {
+          "eyes": {
+            "x": 1196.59,
+            "y": 193,
+            "w": 78.63,
+            "h": 29,
+            "cx": 1235.91,
+            "cy": 207.5,
+            "right": 1275.22,
+            "bottom": 222
+          },
+          "mouth": {
+            "x": 1195.02,
+            "y": 227,
+            "w": 81.78,
+            "h": 32,
+            "cx": 1235.91,
+            "cy": 243,
+            "right": 1276.8,
+            "bottom": 259
+          }
+        },
+        "mascotMarkup": {
+          "childCount": 2,
+          "className": "mascot",
+          "firstChildClass": "ears",
+          "secondChildClass": "eyes",
+          "usesSharedClasses": true
+        },
+        "sparks": [
+          {
+            "x": 1310.55,
+            "y": 143,
+            "w": 22.86,
+            "h": 37,
+            "cx": 1321.98,
+            "cy": 161.5,
+            "right": 1333.41,
+            "bottom": 180
+          },
+          {
+            "x": 1125.41,
+            "y": 254,
+            "w": 22.86,
+            "h": 37,
+            "cx": 1136.84,
+            "cy": 272.5,
+            "right": 1148.27,
+            "bottom": 291
+          },
+          {
+            "x": 1143.41,
+            "y": 153,
+            "w": 22.86,
+            "h": 37,
+            "cx": 1154.84,
+            "cy": 171.5,
+            "right": 1166.27,
+            "bottom": 190
+          }
+        ],
+        "overflow": {
+          "docScrollWidth": 1440,
+          "bodyScrollWidth": 1440,
+          "innerWidth": 1440,
+          "horizontal": false
+        }
+      },
+      "faceCenterDelta": [
+        12.5,
+        8.5
+      ],
+      "screenshot": "docs/acceptance-v051/mascot-after-dashboard-1440.png"
+    }
+  ],
+  "sweep": [],
+  "failures": []
+}

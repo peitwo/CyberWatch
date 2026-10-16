@@ -84,7 +84,7 @@ async function openDetailDialog(id) {
   const event=findEvent(id); if(!event)return;
   renderDetailMeta(event); $('timeline').replaceChildren(); $('detail-dialog').showModal();
   try{
-    const resp=await fetch(`/events/${id}/history`,{cache:'no-store'});
+    const resp=await cwFetch(`/events/${id}/history`,{cache:'no-store'});
     if(!resp.ok)throw new Error(await describeError(resp));
     const rows=await resp.json();
     renderTimeline(Array.isArray(rows)?rows:[]);
@@ -129,13 +129,13 @@ function renderArchive() {
 }
 /* ---------- 归档中心的分页加载 ---------- */
 async function fetchArchivedPage(offset, limit) {
-  const resp=await fetch(`/events/archived?offset=${offset}&limit=${limit}`,{cache:'no-store'});
+  const resp=await cwFetch(`/events/archived?offset=${offset}&limit=${limit}`,{cache:'no-store'});
   if(!resp.ok)throw new Error(await describeError(resp));
   const rows=await resp.json();
   return Array.isArray(rows)?rows:[];
 }
 async function fetchArchivedTotal() {
-  const resp=await fetch('/events/archived/count',{cache:'no-store'});
+  const resp=await cwFetch('/events/archived/count',{cache:'no-store'});
   if(!resp.ok)throw new Error(await describeError(resp));
   const body=await resp.json();
   const total=Number(body?.total);
@@ -223,7 +223,7 @@ function render() {
 async function loadEvents(){
   setText('api-state','连接中');
   try{
-    const response=await fetch('/events?offset=0&limit=100',{cache:'no-store'});
+    const response=await cwFetch('/events?offset=0&limit=100',{cache:'no-store'});
     if(!response.ok)throw new Error(`HTTP ${response.status}`);
     const result=await response.json();if(!Array.isArray(result))throw new Error('接口返回格式异常');
     events=result;setText('api-state','已连接');
@@ -237,7 +237,7 @@ $('new-btn').addEventListener('click',()=>{$('form-error').textContent='';$('new
 for(const id of ['close-dialog','cancel'])$(id).addEventListener('click',()=>$('new-dialog').close());
 $('create-form').addEventListener('submit',async ev=>{
   ev.preventDefault();const form=ev.currentTarget;const save=$('save');const data=Object.fromEntries(new FormData(form).entries());save.disabled=true;$('form-error').textContent='';
-  try{const resp=await fetch('/events',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});if(!resp.ok){const body=await resp.text();throw new Error(`HTTP ${resp.status}: ${body.slice(0,180)}`)}$('new-dialog').close();form.reset();await loadEvents();}
+  try{const resp=await cwFetch('/events',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});if(!resp.ok){const body=await resp.text();throw new Error(`HTTP ${resp.status}: ${body.slice(0,180)}`)}$('new-dialog').close();form.reset();await loadEvents();}
   catch(err){$('form-error').textContent=`保存失败：${err.message}`;}
   finally{save.disabled=false;}
 });
@@ -268,7 +268,7 @@ $('edit-form').elements.namedItem('status').addEventListener('change',syncReason
    未提交字段由后端保持原值（局部更新语义） */
 let pendingReopen = null;
 async function sendPatch(id, payload) {
-  const resp=await fetch(`/events/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  const resp=await cwFetch(`/events/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
   if(!resp.ok)throw new Error(await describeError(resp));
   closeDialog('edit-dialog');closeDialog('reopen-dialog');pendingReopen=null;
   await loadEvents();notify(`事件 #${id} 已更新`,'success');
@@ -305,7 +305,7 @@ $('confirm-form').addEventListener('submit',async ev=>{
   ev.preventDefault();const button=$('confirm-delete');const id=pendingDeleteId;
   if(id===null){closeDialog('confirm-dialog');return;}
   button.disabled=true;
-  try{const resp=await fetch(`/events/${id}`,{method:'DELETE'});if(!resp.ok)throw new Error(await describeError(resp));closeDialog('confirm-dialog');pendingDeleteId=null;await reloadLists();notify(`事件 #${id} 已归档`,'success');}
+  try{const resp=await cwFetch(`/events/${id}`,{method:'DELETE'});if(!resp.ok)throw new Error(await describeError(resp));closeDialog('confirm-dialog');pendingDeleteId=null;await reloadLists();notify(`事件 #${id} 已归档`,'success');}
   catch(err){closeDialog('confirm-dialog');notify(`归档失败：${err.message}`,'error');await reloadLists();}
   finally{button.disabled=false;}
 });
@@ -316,7 +316,7 @@ $('restore-form').addEventListener('submit',async ev=>{
   if(id===null){closeDialog('restore-dialog');return;}
   button.disabled=true;$('restore-error').textContent='';
   try{
-    const resp=await fetch(`/events/${id}/restore`,{method:'POST'});
+    const resp=await cwFetch(`/events/${id}/restore`,{method:'POST'});
     if(!resp.ok)throw new Error(await describeError(resp));
     closeDialog('restore-dialog');pendingRestoreId=null;
     await reloadLists();                                   /* 归档列表 + 普通列表 + 统计卡片 */
@@ -326,4 +326,39 @@ $('restore-form').addEventListener('submit',async ev=>{
   catch(err){$('restore-error').textContent=`恢复失败：${err.message}`;}
   finally{button.disabled=false;}
 });
+/* ---------- V0.5.1 当前用户与退出登录 ----------
+   角色只用于**渲染**（显示徽章、后续按角色隐藏按钮），不参与任何服务端决策。
+   真正的闸门是后端 FastAPI 的 require() 依赖（见设计文档 §4.4）。 */
+const roleLabels = {admin:'管理员', analyst:'分析员', viewer:'只读观察者'};
+let currentUser = null;
+async function loadCurrentUser() {
+  try{
+    const resp = await cwFetch('/auth/me', {method:'GET'});
+    if(!resp.ok) throw new Error(await describeError(resp));
+    const user = await resp.json();
+    currentUser = user;
+    setText('user-name', user.display_name || user.username);
+    setText('user-role', roleLabels[user.role] || user.role);
+    document.body.dataset.role = String(user.role||'');
+  }catch(err){
+    setText('user-name','—');
+    setText('user-role','读取失败');
+  }
+}
+async function logout() {
+  const button = $('logout-btn');
+  button.disabled = true;
+  try{
+    const resp = await cwFetch('/auth/logout', {method:'POST'});
+    if(!resp.ok) throw new Error(await describeError(resp));
+  }catch(err){
+    notify(`退出登录失败：${err.message}`,'error');
+    button.disabled = false;
+    return;
+  }
+  /* 服务端已吊销会话并清除 Cookie；这里只需回到登录页 */
+  window.location.assign('/login');
+}
+$('logout-btn').addEventListener('click', logout);
 reloadLists();
+loadCurrentUser();
