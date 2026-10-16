@@ -1,0 +1,204 @@
+{
+  "base": "http://127.0.0.1:8765",
+  "generated_at": "2026-10-16T10:13:26.895Z",
+  "total": 37,
+  "failed": 0,
+  "results": [
+    {
+      "name": "A1 匿名访问 /dashboard 被重定向到登录页（带 next）",
+      "ok": true,
+      "detail": "http://127.0.0.1:8765/login?next=/dashboard"
+    },
+    {
+      "name": "A2 匿名 GET /events → 401",
+      "ok": true,
+      "detail": "status=401"
+    },
+    {
+      "name": "A3 匿名 POST /events → 401",
+      "ok": true,
+      "detail": "status=401"
+    },
+    {
+      "name": "A4 next 指向非 dashboard 时显示\"登录后返回哪\"的提示",
+      "ok": true,
+      "detail": "\"登录成功后将返回：/events\""
+    },
+    {
+      "name": "B1 错误口令后停留在 /login",
+      "ok": true,
+      "detail": "http://127.0.0.1:8765/login"
+    },
+    {
+      "name": "B2 错误提示就是后端的统一文案（用户名或密码错误）",
+      "ok": true,
+      "detail": "\"用户名或密码错误\""
+    },
+    {
+      "name": "B3 没有被 cwFetch 的\"会话过期\"文案盖掉",
+      "ok": true,
+      "detail": "\"用户名或密码错误\""
+    },
+    {
+      "name": "B4 错误后密码框被清空",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "B5 「不存在的用户」与「错误口令」响应逐字节一致",
+      "ok": true,
+      "detail": "status=401 body={\"detail\":\"用户名或密码错误\"}"
+    },
+    {
+      "name": "C1 登录后进入 /dashboard",
+      "ok": true,
+      "detail": "http://127.0.0.1:8765/dashboard"
+    },
+    {
+      "name": "C2 事件列表渲染出数据（真实库副本初始 3 条）",
+      "ok": true,
+      "detail": "rows=3"
+    },
+    {
+      "name": "C3 顶部显示当前用户（显示名优先，回退用户名）",
+      "ok": true,
+      "detail": "验收管理员"
+    },
+    {
+      "name": "C4 顶部显示角色标签",
+      "ok": true,
+      "detail": "管理员"
+    },
+    {
+      "name": "C5 无 JS 运行时错误",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "C6 已登录会话下 GET /events?limit=2 → 200",
+      "ok": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "D1 会话存在时可读到 cw_csrf（非 HttpOnly，长度 64）",
+      "ok": true,
+      "detail": "len=64"
+    },
+    {
+      "name": "D2 已登录但缺 CSRF 的 POST → 403",
+      "ok": true,
+      "detail": "status=403"
+    },
+    {
+      "name": "D3 403 文案明确指出 CSRF",
+      "ok": true,
+      "detail": "{\"detail\":\"CSRF 校验失败\"}"
+    },
+    {
+      "name": "D4 带上正确 CSRF 后 POST → 201",
+      "ok": true,
+      "detail": "status=201 body={\"title\":\"浏览器验收·带 CSRF\",\"severity\":\"low\",\"status\":\"open\",\"description\":\"\",\"id\":4,\"created_at\":\"2026-"
+    },
+    {
+      "name": "D5 前端 cwFetch 自动附加 CSRF → 201",
+      "ok": true,
+      "detail": "status=201 body={\"title\":\"浏览器验收·cwFetch 自动带头\",\"severity\":\"low\",\"status\":\"open\",\"description\":\"\",\"id\":5,\"created_at\":"
+    },
+    {
+      "name": "D6 跨站 Origin 的登录被后端拒绝（403）",
+      "ok": true,
+      "detail": "status=403 body={\"detail\":\"登录请求来源校验失败\"}"
+    },
+    {
+      "name": "D7 同站 Origin 的登录不被来源校验误伤（401 而非 403）",
+      "ok": true,
+      "detail": "status=401 body={\"detail\":\"用户名或密码错误\"}"
+    },
+    {
+      "name": "E1 会话失效后 GET /events → 401",
+      "ok": true,
+      "detail": "status=401"
+    },
+    {
+      "name": "E2 无 Cookie 的全新浏览器访问 /dashboard 被弹回登录页",
+      "ok": true,
+      "detail": "http://127.0.0.1:8765/login?next=/dashboard"
+    },
+    {
+      "name": "E3 服务器对无会话的 /dashboard 返回 302 + location",
+      "ok": true,
+      "detail": "status=302 location=/login?next=/dashboard"
+    },
+    {
+      "name": "E4 cwFetch 收到 401 后自动跳转 /login 并带 next",
+      "ok": true,
+      "detail": "http://127.0.0.1:8765/login?next=%2Fdashboard"
+    },
+    {
+      "name": "F1 点击\"退出\"后回到登录页",
+      "ok": true,
+      "detail": "http://127.0.0.1:8765/login"
+    },
+    {
+      "name": "F2 未认证调用 /auth/logout 仍是 204（幂等，例外 E1）",
+      "ok": true,
+      "detail": "status=204"
+    },
+    {
+      "name": "F3 退出后（全新浏览器）再次访问 /dashboard 要求登录",
+      "ok": true,
+      "detail": "http://127.0.0.1:8765/login?next=/dashboard"
+    },
+    {
+      "name": "F4 退出后 /events → 401",
+      "ok": true,
+      "detail": "status=401"
+    },
+    {
+      "name": "G-390 无横向溢出",
+      "ok": true,
+      "detail": "overflow=0px"
+    },
+    {
+      "name": "G-720 无横向溢出",
+      "ok": true,
+      "detail": "overflow=0px"
+    },
+    {
+      "name": "G-1440 无横向溢出",
+      "ok": true,
+      "detail": "overflow=0px"
+    },
+    {
+      "name": "G1 三档视口均可正常渲染并登录",
+      "ok": true,
+      "detail": "390 / 720 / 1440"
+    },
+    {
+      "name": "H1 /login 返回 Cache-Control: no-store",
+      "ok": true,
+      "detail": "no-store"
+    },
+    {
+      "name": "H2 匿名 /dashboard 的 302 也带 Cache-Control: no-store",
+      "ok": true,
+      "detail": "no-store"
+    },
+    {
+      "name": "H3 全程无未捕获的 JS 异常",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "screenshots": [
+    "docs\\acceptance-v051\\01-login-anon-1440.png",
+    "docs\\acceptance-v051\\02-login-wrong-password.png",
+    "docs\\acceptance-v051\\03-dashboard-1440.png",
+    "docs\\acceptance-v051\\login-390.png",
+    "docs\\acceptance-v051\\dashboard-390.png",
+    "docs\\acceptance-v051\\login-720.png",
+    "docs\\acceptance-v051\\dashboard-720.png",
+    "docs\\acceptance-v051\\login-1440.png",
+    "docs\\acceptance-v051\\dashboard-1440.png"
+  ]
+}

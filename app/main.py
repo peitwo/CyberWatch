@@ -1,212 +1,79 @@
-"""CyberWatch V0.1: a learning-oriented security event API."""
+"""CyberWatch 应用入口：组装依赖、声明业务路由、挂载静态资源。
+
+V0.5 的结构调整（评审意见 R1-1）：
+
+- **模型全部迁到 `app/models.py`**，本模块只做 **re-export**（保持既有
+  `from app.main import Event` 这类导入路径继续可用）；
+- **引擎与会话迁到 `app/database.py`**（切断 `main ↔ auth` 的循环导入）；
+- **认证/会话/CSRF 在 `app/auth.py`**，权限矩阵在 `app/permissions.py`；
+- 本模块的职责收敛为：**组装 + 路由**。既有路由的**函数体一字未改**，
+  只在其装饰器上增加了 `dependencies=[Depends(require(...))]`。
+
+依赖方向（严格单向）：config → database → models → permissions → auth → main
+"""
+from __future__ import annotations
+
+import sys
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from enum import Enum
-from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import ConfigDict, model_validator
-from sqlmodel import Field, Session, SQLModel, create_engine, func, select
+from sqlmodel import Session, func, select
 
-from app.config import (
+# ---------------------------------------------------------------------------
+# 0) 兼容性 re-export（**不是可选**，见设计文档 §2.0）
+#    tests/conftest.py、test_config.py、test_migrations.py、test_restore.py、
+#    test_status_history.py 都按 `app.main.X` 取名字。保留这些名字，
+#    换来的是它们**零改动**。
+# ---------------------------------------------------------------------------
+from app.config import (  # noqa: F401  兼容性 re-export
     BASE_DIR,
     DATABASE_URL_ENV,
     enable_sqlite_foreign_keys,
     resolve_database_url,
     sqlite_file_path,
 )
-
-# 数据库 URL 由 app/config.py 统一解析（优先级：显式参数 > 环境变量 > 项目根绝对路径）。
-# 这样做的目的：让「应用连接的库」与「Alembic 迁移的库」永远是同一个，
-# 且默认路径基于项目根目录、不再随进程 cwd 漂移。
-DATABASE_URL = resolve_database_url()
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
-# 让 status_history.event_id → event.id 的外键**真实生效**（SQLite 默认不校验外键）
-enable_sqlite_foreign_keys(engine)
-
-#: 审计动作类型。当前实现三种：状态变更 / 归档 / 恢复。
-ACTION_STATUS_CHANGE = "status_change"
-ACTION_ARCHIVE = "archive"
-ACTION_RESTORE = "restore"
-
-#: 操作主体（actor）的**开发环境占位身份**。
-#: 未来接入账号系统后，这里改为从认证上下文（当前登录用户）读取，其余代码不变。
-DEFAULT_ACTOR_ID = "local-dev"
-
-
-class Severity(str, Enum):
-    low = "low"
-    medium = "medium"
-    high = "high"
-
-
-class Status(str, Enum):
-    """安全事件的生命周期状态。三个值之间**可任意方向切换**（不实现状态机）。"""
-
-    open = "open"
-    investigating = "investigating"
-    resolved = "resolved"
-
-
-class EventBase(SQLModel):
-    title: str = Field(min_length=3, max_length=100)
-    severity: Severity = Severity.low
-    # default 负责「应用新建事件默认 open」；server_default 负责「迁移时给已有行补 open」，
-    # 并且让 create_all 建出的表与 Alembic 迁移出的表结构完全一致。
-    status: Status = Field(default=Status.open, sa_column_kwargs={"server_default": "open"})
-    description: str = Field(default="", max_length=1000)
-
-
-class Event(EventBase, table=True):
-    id: int | None = Field(default=None, primary_key=True)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    # 软删除 / 归档标记：NULL = 未归档（普通列表可见）；非 NULL = 已归档（值为归档时间 UTC）。
-    # 采用软删除而不是物理删除，是为了让 status_history 的外键永远有效、审计记录永不丢失。
-    deleted_at: datetime | None = Field(default=None, index=True)
-
-
-class StatusHistory(SQLModel, table=True):
-    """状态变更历史（只追加的审计日志）。
-
-    每次「状态切换 / 归档 / 恢复」追加一行，**永不修改、永不删除**：
-
-    - 应用层不提供任何修改或删除本表的接口（见文件末尾的路由清单）；
-    - 唯一写入口是状态变更 / 归档 / 恢复这三条业务链路，且与业务字段修改
-      （状态、deleted_at）**同事务提交**。
-
-    ``old_status`` / ``new_status`` 用 ``Status`` 枚举：DDL 类型为 ``VARCHAR(13)``
-    （与 ``event.status`` 完全一致），值域由 Pydantic 在写入前把关。
-    归档动作的 old/new 相同（状态本身没变，靠 ``action`` 区分语义）。
-    """
-
-    __tablename__ = "status_history"
-
-    id: int | None = Field(default=None, primary_key=True)
-    event_id: int = Field(foreign_key="event.id", index=True)
-    old_status: Status
-    new_status: Status
-    reason: str = Field(default="", max_length=1000)
-    action: str = Field(default=ACTION_STATUS_CHANGE, max_length=50)
-    actor_id: str = Field(default=DEFAULT_ACTOR_ID, max_length=64)
-    changed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-
-class EventCreate(EventBase):
-    # 未知字段（通常是拼写错误）直接拒绝，避免字段被静默忽略
-    model_config = ConfigDict(extra="forbid")
-
-
-class EventUpdate(SQLModel):
-    # 同上：拼错字段名返回 422，而不是悄悄跳过
-    model_config = ConfigDict(extra="forbid")
-
-    title: str | None = Field(default=None, min_length=3, max_length=100)
-    severity: Severity | None = None
-    status: Status | None = None
-    description: str | None = Field(default=None, max_length=1000)
-    # 状态变更的原因说明。它**不是 event 表的列**，只是 PATCH 请求里
-    # 「本次变更为什么」的载体，会被写入 status_history.reason。
-    # 因此在 update_event 里必须先把它从更新数据中取出，不能交给 sqlmodel_update。
-    reason: str | None = Field(default=None, max_length=1000)
-
-    @model_validator(mode="before")
-    @classmethod
-    def reject_explicit_null(cls, data):
-        """区分「字段未提交」与「字段被显式设为 null」。
-
-        未提交的字段保持原值（局部更新语义）；显式传 null 会导致
-        sqlmodel_update 把 None 写入 NOT NULL 列，commit 时抛 IntegrityError
-        变成 HTTP 500。这里提前拦截，统一返回 422。
-
-        注意：这里遍历的是**整个提交体**，不枚举字段名，所以将来新增字段
-        （如 status）会自动获得同样的 null 防护。
-        """
-        if isinstance(data, dict):
-            null_fields = [name for name, value in data.items() if value is None]
-            if null_fields:
-                raise ValueError(
-                    "字段 " + "、".join(null_fields)
-                    + " 不能为 null；如需保持原值请省略该字段"
-                )
-        return data
-
-
-class EventRead(EventBase):
-    model_config = ConfigDict(from_attributes=True)
-    id: int
-    created_at: datetime
-
-
-class StatusHistoryRead(SQLModel):
-    """状态变更历史的只读响应模型（时间线数据来源）。"""
-
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    event_id: int
-    old_status: Status
-    new_status: Status
-    reason: str
-    action: str
-    actor_id: str
-    changed_at: datetime
-
-
-class ArchivedEventRead(EventRead):
-    """归档中心使用的响应模型。
-
-    比普通 ``EventRead`` 多一个 ``deleted_at``：归档列表需要展示归档时间，
-    而普通列表不需要（普通列表里这一列恒为 NULL）。
-    """
-
-    deleted_at: datetime
-
-
-class ArchivedEventCount(SQLModel):
-    """归档事件总数。
-
-    归档中心采用「分页加载」：单次请求至多拿到 ``limit`` 条，
-    所以头部「共 N 条」里的 N 必须由数据库 ``COUNT(*)`` 给出，
-    不能拿「已加载条数」去凑（那会把总数显示成当前页大小）。
-    """
-
-    total: int
-
-
-#: 需要强制填写原因的状态转移（后端权威规则，前端只是体验层）。
-#: 注意：这里**不包含** open → resolved —— 需求只要求 investigating → resolved
-#: 与 resolved → open/investigating 两种情况填原因，多要求会破坏既有测试语义。
-REASON_REQUIRED_FROM_INVESTIGATING = Status.resolved
-REASON_REQUIRED_FROM_RESOLVED = (Status.open, Status.investigating)
-
-
-def requires_status_reason(old: Status, new: Status) -> bool:
-    """判断某个状态转移是否**强制要求**填写原因。
-
-    - ``investigating → resolved``：必须有「解决原因」
-    - ``resolved → open / investigating``：必须有「重新打开原因」
-    - 其它方向（含状态未发生变化）：原因可选
-
-    这是纯函数：给定 (旧状态, 新状态) 就有确定答案，便于单测覆盖，
-    不依赖运行时上下文，也不靠前端自觉。
-    """
-    if old == new:
-        return False
-    if old == Status.investigating and new == REASON_REQUIRED_FROM_INVESTIGATING:
-        return True
-    if old == Status.resolved and new in REASON_REQUIRED_FROM_RESOLVED:
-        return True
-    return False
-
-
-def get_session():
-    with Session(engine) as session:
-        yield session
-
-
-SessionDep = Annotated[Session, Depends(get_session)]
+from app.database import (  # noqa: F401  兼容性 re-export
+    DATABASE_URL,
+    SessionDep,
+    engine,
+    get_session,
+)
+from app.models import (  # noqa: F401  兼容性 re-export
+    ACTION_ARCHIVE,
+    ACTION_RESTORE,
+    ACTION_STATUS_CHANGE,
+    DEFAULT_ACTOR_ID,
+    LEGACY_ACTOR_ID,
+    SYSTEM_ACTOR_ID,
+    ArchivedEventCount,
+    ArchivedEventRead,
+    Event,
+    EventBase,
+    EventCreate,
+    EventRead,
+    EventUpdate,
+    Role,
+    Severity,
+    Status,
+    StatusHistory,
+    StatusHistoryRead,
+    User,
+    UserSession,
+    requires_status_reason,
+    utcnow,
+)
+from app.auth import (  # noqa: F401  兼容性 re-export
+    AUTH_SETTINGS,
+    auth_router,
+    require,
+    require_html_session,
+    require_role,
+)
+from app.permissions import Permission
 
 
 @asynccontextmanager
@@ -214,15 +81,27 @@ async def lifespan(app: FastAPI):
     # 启动时只做**只读**结构检查，绝不修改数据库。
     # （结构变更的唯一入口是 Alembic：`alembic upgrade head`）
     ensure_schema_ready()
+    report_configuration()
     yield
+
+
+def report_configuration() -> None:
+    """打印生效配置与安全警告。**绝不含任何密钥或密码。**"""
+    print(f"[CyberWatch] 生效配置：{AUTH_SETTINGS.describe()}", file=sys.stderr)
+    print(
+        f"[CyberWatch] 数据库：{DATABASE_URL}",
+        file=sys.stderr,
+    )
+    for warning in AUTH_SETTINGS.warnings:
+        print(f"[CyberWatch] ⚠️  {warning}", file=sys.stderr)
 
 
 def ensure_schema_ready() -> None:
     """只读地确认数据库结构已是最新，否则给出中文操作指引。
 
     不使用 ``create_all``：它只能建"不存在的表"，永远无法给已有表加列，
-    会与 Alembic 形成双轨（`create_all` 建的表不写 `alembic_version`，
-    之后 `upgrade` 会因为"表已存在"而失败）。因此结构变更一律交给 Alembic。
+    会与 Alembic 形成双轨（``create_all`` 建的表不写 ``alembic_version``，
+    之后 ``upgrade`` 会因为"表已存在"而失败）。因此结构变更一律交给 Alembic。
     """
     db_file = sqlite_file_path(DATABASE_URL)
     if db_file is not None and not db_file.exists():
@@ -238,17 +117,25 @@ def ensure_schema_ready() -> None:
         event_columns = [
             row[1] for row in connection.exec_driver_sql("PRAGMA table_info(event)")
         ]
-        history_tables = connection.exec_driver_sql(
-            "select name from sqlite_master where type='table' and name='status_history'"
-        ).fetchall()
+        existing_tables = {
+            row[0]
+            for row in connection.exec_driver_sql(
+                "select name from sqlite_master where type='table'"
+            )
+        }
 
     missing = []
     if "status" not in event_columns:
         missing.append("event.status")
     if "deleted_at" not in event_columns:
         missing.append("event.deleted_at")
-    if not history_tables:
+    if "status_history" not in existing_tables:
         missing.append("status_history 表")
+    # V0.5：认证需要两张新表
+    if "app_user" not in existing_tables:
+        missing.append("app_user 表")
+    if "user_session" not in existing_tables:
+        missing.append("user_session 表")
 
     if missing:
         raise RuntimeError(
@@ -259,20 +146,103 @@ def ensure_schema_ready() -> None:
         )
 
 
-app = FastAPI(title="CyberWatch", version="0.1.0", lifespan=lifespan)
+# `docs_url` / `redoc_url` / `openapi_url` 一律设为 None（关掉内置文档路由），
+# 改由本模块**自己注册**，这样才能按 `docs_mode` 三态施加不同的访问策略。
+app = FastAPI(
+    title="CyberWatch",
+    version="0.5.1",
+    lifespan=lifespan,
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
+)
+
+app.include_router(auth_router)
 
 
+# ---------------------------------------------------------------------------
+# 1) 公开路由（例外 E4：不含任何业务数据）
+# ---------------------------------------------------------------------------
 @app.get("/")
 def home():
-    return {"app": "CyberWatch", "version": "0.1.0", "docs": "/docs", "dashboard": "/dashboard"}
+    return {"app": "CyberWatch", "version": "0.5.1", "docs": "/docs", "login": "/login"}
 
 
-@app.get("/dashboard")
+@app.get("/healthz")
+def healthz():
+    """探针端点。**刻意只返回一个字段**：不含版本、库路径、用户数，
+    避免它变成信息泄露面。"""
+    return {"status": "ok"}
+
+
+def no_store(response: FileResponse) -> FileResponse:
+    """给**认证后**才可见的 HTML 加上 ``Cache-Control: no-store``。
+
+    为什么必须显式加：``FileResponse`` 会带上 `etag` / `last-modified`，
+    而没有 `Cache-Control` 时浏览器可以自行判断"内容没变，直接用缓存"。
+    于是会出现一个很隐蔽的现象 —— 用户退出登录后重新访问 ``/dashboard``，
+    Chrome 直接拿缓存渲染出 dashboard 骨架，**根本没有再问服务器**。
+    页面上随后发出的 API 请求会 401 并跳回登录页，所以最终结果是对的，
+    但"一个无会话的浏览器渲染出已认证页面"这件事本身不该发生。
+
+    这是真实浏览器验收（`tools/browser_acceptance.js`）发现的问题，
+    单靠 TestClient 永远看不到 —— 它不实现 HTTP 缓存。
+    """
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.get("/login")
+def login_page():
+    """登录页（HTML）。必须在未登录时可访问，否则永远登不进去。"""
+    # 登录页本身不含机密，但它带 `?next=` 参数，缓存住会让人以为"登录后去哪"
+    # 是固定的；一并 no-store，代价可忽略（1.7 KB 的静态文件）。
+    return no_store(FileResponse(BASE_DIR / "templates" / "login.html"))
+
+
+@app.get("/dashboard", dependencies=[Depends(require_html_session())])
 def dashboard():
-    return FileResponse(BASE_DIR / "templates" / "dashboard.html")
+    """Dashboard（HTML）。未登录 → 302 → `/login?next=/dashboard`。"""
+    return no_store(FileResponse(BASE_DIR / "templates" / "dashboard.html"))
 
 
-@app.post("/events", response_model=EventRead, status_code=201)
+# ---------------------------------------------------------------------------
+# 2) 文档路由（`docs_mode` 三态：admin / public / disabled）
+# ---------------------------------------------------------------------------
+if AUTH_SETTINGS.docs_mode == "admin":
+    _docs_guard = [Depends(require_role(Role.admin, html=True))]
+    _openapi_guard = [Depends(require_role(Role.admin))]
+elif AUTH_SETTINGS.docs_mode == "public":
+    _docs_guard = []
+    _openapi_guard = []
+else:  # disabled
+    _docs_guard = None
+    _openapi_guard = None
+
+if _docs_guard is not None:
+
+    @app.get("/openapi.json", include_in_schema=False, dependencies=_openapi_guard)
+    def openapi_schema():
+        return JSONResponse(app.openapi())
+
+    @app.get("/docs", include_in_schema=False, dependencies=_docs_guard)
+    def swagger_ui():
+        return get_swagger_ui_html(openapi_url="/openapi.json", title="CyberWatch API 文档")
+
+    @app.get("/redoc", include_in_schema=False, dependencies=_docs_guard)
+    def redoc_ui():
+        return get_redoc_html(openapi_url="/openapi.json", title="CyberWatch API 文档")
+
+
+# ---------------------------------------------------------------------------
+# 3) 安全事件（**全部业务 API 必须认证**，V0.5.1 覆盖清单见 permissions.V051_PROTECTED_ROUTES）
+# ---------------------------------------------------------------------------
+@app.post(
+    "/events",
+    response_model=EventRead,
+    status_code=201,
+    dependencies=[Depends(require(Permission.EVENT_CREATE))],
+)
 def create_event(payload: EventCreate, session: SessionDep):
     event = Event.model_validate(payload)
     session.add(event)
@@ -281,7 +251,11 @@ def create_event(payload: EventCreate, session: SessionDep):
     return event
 
 
-@app.get("/events", response_model=list[EventRead])
+@app.get(
+    "/events",
+    response_model=list[EventRead],
+    dependencies=[Depends(require(Permission.EVENT_READ))],
+)
 def list_events(session: SessionDep, severity: Severity | None = None,
                 status: Status | None = None,
                 offset: int = Query(default=0, ge=0), limit: int = Query(default=20, ge=1, le=100)):
@@ -300,7 +274,11 @@ def list_events(session: SessionDep, severity: Severity | None = None,
 # 注意路由顺序：本路由**必须**声明在 `GET /events/{event_id}` 之前。
 # FastAPI 按声明顺序匹配，若放在其后，"archived" 会被当成 event_id 去解析成 int，
 # 直接返回 422 —— 归档中心的入口就会「莫名其妙打不开」。
-@app.get("/events/archived", response_model=list[ArchivedEventRead])
+@app.get(
+    "/events/archived",
+    response_model=list[ArchivedEventRead],
+    dependencies=[Depends(require(Permission.EVENT_READ))],
+)
 def list_archived_events(
     session: SessionDep,
     offset: int = Query(default=0, ge=0),
@@ -322,7 +300,11 @@ def list_archived_events(
     return session.exec(statement).all()
 
 
-@app.get("/events/archived/count", response_model=ArchivedEventCount)
+@app.get(
+    "/events/archived/count",
+    response_model=ArchivedEventCount,
+    dependencies=[Depends(require(Permission.EVENT_READ))],
+)
 def count_archived_events(session: SessionDep):
     """归档事件的**准确**总数（归档中心头部「共 N 条」的数据来源）。
 
@@ -341,7 +323,11 @@ def count_archived_events(session: SessionDep):
     return ArchivedEventCount(total=session.exec(statement).one())
 
 
-@app.get("/events/{event_id}", response_model=EventRead)
+@app.get(
+    "/events/{event_id}",
+    response_model=EventRead,
+    dependencies=[Depends(require(Permission.EVENT_READ))],
+)
 def get_event(event_id: int, session: SessionDep):
     event = session.get(Event, event_id)
     # 已归档事件对普通接口「不存在」：返回 404，未来通过专用归档接口查看。
@@ -351,7 +337,11 @@ def get_event(event_id: int, session: SessionDep):
     return event
 
 
-@app.get("/events/{event_id}/history", response_model=list[StatusHistoryRead])
+@app.get(
+    "/events/{event_id}/history",
+    response_model=list[StatusHistoryRead],
+    dependencies=[Depends(require(Permission.AUDIT_READ))],
+)
 def list_event_history(event_id: int, session: SessionDep):
     """返回某个事件的完整状态变更时间线（按时间升序，从旧到新）。
 
@@ -370,7 +360,11 @@ def list_event_history(event_id: int, session: SessionDep):
     return session.exec(statement).all()
 
 
-@app.patch("/events/{event_id}", response_model=EventRead)
+@app.patch(
+    "/events/{event_id}",
+    response_model=EventRead,
+    dependencies=[Depends(require(Permission.EVENT_UPDATE))],
+)
 def update_event(event_id: int, payload: EventUpdate, session: SessionDep):
     event = session.get(Event, event_id)
     if event is None:
@@ -415,7 +409,11 @@ def update_event(event_id: int, payload: EventUpdate, session: SessionDep):
     return event
 
 
-@app.delete("/events/{event_id}", status_code=204)
+@app.delete(
+    "/events/{event_id}",
+    status_code=204,
+    dependencies=[Depends(require(Permission.EVENT_ARCHIVE))],
+)
 def delete_event(event_id: int, session: SessionDep):
     """归档事件（软删除）。
 
@@ -444,7 +442,11 @@ def delete_event(event_id: int, session: SessionDep):
     session.commit()
 
 
-@app.post("/events/{event_id}/restore", response_model=EventRead)
+@app.post(
+    "/events/{event_id}/restore",
+    response_model=EventRead,
+    dependencies=[Depends(require(Permission.EVENT_RESTORE))],
+)
 def restore_event(event_id: int, session: SessionDep):
     """恢复（取消归档）一个已归档事件。
 

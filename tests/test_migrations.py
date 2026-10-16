@@ -456,3 +456,249 @@ def test_offline_sql_incremental_0003_to_0004(tmp_path, in_tempdir):
     assert "CREATE INDEX ix_status_history_event_id" in sql
     assert "ALTER TABLE event" not in sql, "增量 SQL 不应改动 event 表"
     assert not db.exists()
+
+
+# ---------------------------------------------------------------------------
+# 8) V0.5.1 专门：认证表（0005 = app_user / user_session）
+# ---------------------------------------------------------------------------
+APP_USER_COLUMNS = {
+    "id", "username", "password_hash", "role", "is_active", "created_at",
+    "password_changed_at", "last_login_at", "failed_login_count", "locked_until",
+    "display_name",
+}
+USER_SESSION_COLUMNS = {
+    "id", "token_hash", "user_id", "csrf_token", "created_at", "last_seen_at",
+    "expires_at", "revoked_at", "revoked_reason", "user_agent", "ip_address",
+}
+
+
+def indexes_of(db_path: Path, table: str) -> dict[str, tuple[bool, list[str]]]:
+    """表上的索引：``{名字: (是否唯一, 列名列表)}``。"""
+    with connect(db_path) as con:
+        rows = list(con.execute(f"PRAGMA index_list({table})"))
+    result: dict[str, tuple[bool, list[str]]] = {}
+    with connect(db_path) as con:
+        for row in rows:
+            name, unique = row[1], bool(row[2])
+            columns = [r[2] for r in con.execute(f"PRAGMA index_info({name})")]
+            result[name] = (unique, columns)
+    return result
+
+
+def test_migration_0005_creates_auth_tables_with_real_foreign_key(tmp_path, in_tempdir):
+    """0005：建 `app_user` / `user_session`，外键必须是**真实约束**。
+
+    评审意见 R1-4 的原话是"在临时数据库用 `PRAGMA foreign_key_list` 验证"——
+    该要求针对 0006 的 `actor_user_id`；这里是它在 0005 上的同款做法：
+    不靠"文档说有关系"，而是直接问 SQLite。
+    """
+    db = tmp_path / "auth-tables.db"
+    assert_in_tempdir(db, in_tempdir)
+    cfg = alembic_config(db)
+    command.upgrade(cfg, "0004")
+    seed_old_rows(db)
+    events_before = selects(
+        db, "select id,title,severity,description,created_at from event order by id"
+    )
+
+    command.upgrade(cfg, "0005")
+
+    assert set(columns_of(db, "app_user")) == APP_USER_COLUMNS
+    assert set(columns_of(db, "user_session")) == USER_SESSION_COLUMNS
+
+    # 外键：user_session.user_id → app_user.id（PRAGMA 返回的第 3~5 列即
+    # 被引用表 / 本表列 / 被引用列）
+    fks = foreign_keys_of(db, "user_session")
+    assert [f[2:5] for f in fks] == [("app_user", "user_id", "id")], fks
+    # app_user 自己不应该有外键（它是最底层的主体表）
+    assert foreign_keys_of(db, "app_user") == []
+
+    # 唯一性约束按**唯一索引**实现（与 SQLModel 的 index=True, unique=True 一致）
+    user_indexes = indexes_of(db, "app_user")
+    assert any(
+        unique and columns == ["username"] for unique, columns in user_indexes.values()
+    ), user_indexes
+    session_indexes = indexes_of(db, "user_session")
+    assert any(
+        unique and columns == ["token_hash"] for unique, columns in session_indexes.values()
+    ), session_indexes
+
+    # 迁移只建表、不造数据：账号由 CLI 显式创建
+    assert selects(db, "select count(*) from app_user") == [(0,)]
+    assert selects(db, "select count(*) from user_session") == [(0,)]
+
+    # 既有数据一字不动，版本推进到 head
+    assert selects(
+        db, "select id,title,severity,description,created_at from event order by id"
+    ) == events_before
+    assert selects(db, "select version_num from alembic_version") == [(HEAD_REVISION,)]
+
+
+def test_foreign_key_is_enforced_on_user_session(tmp_path, in_tempdir):
+    """外键不只是"写在 DDL 里"—— 打开 `PRAGMA foreign_keys` 后必须真的拦住脏数据。"""
+    db = tmp_path / "fk-enforced.db"
+    assert_in_tempdir(db, in_tempdir)
+    command.upgrade(alembic_config(db), "head")
+
+    con = sqlite3.connect(str(db))
+    try:
+        con.execute("PRAGMA foreign_keys=ON")
+        con.execute(
+            "insert into app_user (id, username, password_hash, role, is_active,"
+            " created_at, password_changed_at, failed_login_count)"
+            " values (1, 'admin', '$argon2id$fake', 'admin', 1,"
+            " '2026-10-16 00:00:00', '2026-10-16 00:00:00', 0)"
+        )
+        con.execute(
+            "insert into user_session (id, token_hash, user_id, csrf_token, created_at,"
+            " last_seen_at, expires_at) values (1, 'h', 1, 'c',"
+            " '2026-10-16 00:00:00', '2026-10-16 00:00:00', '2026-10-16 01:00:00')"
+        )
+        con.commit()
+
+        with pytest.raises(sqlite3.IntegrityError):
+            con.execute(
+                "insert into user_session (id, token_hash, user_id, csrf_token, created_at,"
+                " last_seen_at, expires_at) values (2, 'h2', 999, 'c',"
+                " '2026-10-16 00:00:00', '2026-10-16 00:00:00', '2026-10-16 01:00:00')"
+            )
+    finally:
+        con.close()
+
+
+def test_auth_tables_migrated_matches_model_schema(tmp_path, in_tempdir):
+    """V0.5.1 的防漂移：认证表也要「迁移建出的结构 == 模型声明的结构」。
+
+    新表尤其容易漂移：`create_all` 与 Alembic 各写一遍 DDL，
+    列宽（`role` 的 VARCHAR(7)！）与 `server_default` 的有无都极易不一致。
+    """
+    migrated = tmp_path / "auth-migrated.db"
+    assert_in_tempdir(migrated, in_tempdir)
+    command.upgrade(alembic_config(migrated), "head")
+
+    model_db = tmp_path / "auth-model.db"
+    assert_in_tempdir(model_db, in_tempdir)
+    from sqlmodel import create_engine
+
+    model_engine = create_engine(f"sqlite:///{model_db.as_posix()}")
+    try:
+        SQLModel.metadata.create_all(model_engine)
+    finally:
+        model_engine.dispose()
+
+    for table, expected in (
+        ("app_user", APP_USER_COLUMNS),
+        ("user_session", USER_SESSION_COLUMNS),
+    ):
+        migrated_schema = schema_by_name(migrated, table)
+        model_schema = schema_by_name(model_db, table)
+        assert set(migrated_schema) == set(model_schema) == expected, table
+        for name in sorted(model_schema):
+            assert migrated_schema[name] == model_schema[name], f"{table}.{name}"
+
+    # 钉住那个最容易改错的宽度：role 枚举最长值 analyst = 7
+    assert schema_by_name(migrated, "app_user")["role"][0] == "VARCHAR(7)"
+    # token_hash 存 SHA-256 的 hex（正好 64），csrf_token 存 32 字节的 hex（64）
+    assert schema_by_name(migrated, "user_session")["token_hash"][0] == "VARCHAR(64)"
+    assert schema_by_name(migrated, "user_session")["csrf_token"][0] == "VARCHAR(64)"
+
+
+def test_downgrade_0005_drops_auth_tables_only(tmp_path, in_tempdir):
+    """回退：只删两张新表，`event` / `status_history` 与它们的行必须完好。"""
+    db = tmp_path / "down-auth.db"
+    assert_in_tempdir(db, in_tempdir)
+    cfg = alembic_config(db)
+    command.upgrade(cfg, "0004")
+    seed_old_rows(db)
+    command.upgrade(cfg, "head")
+    assert columns_of(db, "app_user") and columns_of(db, "user_session")
+
+    command.downgrade(cfg, "0004")
+
+    tables = [r[1] for r in selects(db, "select type,name from sqlite_master")]
+    assert "app_user" not in tables and "user_session" not in tables
+    assert "event" in tables and "status_history" in tables
+    assert len(selects(db, "select id from event order by id")) == 3
+    assert selects(db, "select version_num from alembic_version") == [("0004",)]
+
+
+def test_upgrade_downgrade_0005_round_trip_is_idempotent(tmp_path, in_tempdir):
+    """往返：head → 0004 → head，表结构必须回到完全相同的定义。"""
+    db = tmp_path / "round-auth.db"
+    assert_in_tempdir(db, in_tempdir)
+    cfg = alembic_config(db)
+    command.upgrade(cfg, "0005")
+    before = (
+        schema_by_name(db, "app_user"),
+        schema_by_name(db, "user_session"),
+        foreign_keys_of(db, "user_session"),
+    )
+
+    command.downgrade(cfg, "0004")
+    command.upgrade(cfg, "0005")
+
+    after = (
+        schema_by_name(db, "app_user"),
+        schema_by_name(db, "user_session"),
+        foreign_keys_of(db, "user_session"),
+    )
+    assert after == before
+    assert selects(db, "select version_num from alembic_version") == [("0005",)]
+
+
+def test_offline_sql_incremental_0004_to_0005(tmp_path, in_tempdir):
+    """本轮增量 SQL 必须能先过目：只建两张认证表，不动任何既有表。"""
+    db = tmp_path / "offline-0405.db"
+    assert_in_tempdir(db, in_tempdir)
+    buffer = io.StringIO()
+    command.upgrade(alembic_config(db, buffer=buffer), "0004:0005", sql=True)
+    sql = buffer.getvalue()
+
+    assert "CREATE TABLE app_user" in sql
+    assert "CREATE TABLE user_session" in sql
+    assert "FOREIGN KEY(user_id) REFERENCES app_user (id)" in sql
+    assert "CREATE UNIQUE INDEX ix_app_user_username" in sql
+    assert "CREATE UNIQUE INDEX ix_user_session_token_hash" in sql
+    # 本轮是**纯新增**：不得出现任何 ALTER / DROP / 数据改动。
+    # 注意要把 Alembic 自己的版本记账（`UPDATE alembic_version SET ...`）排除掉 ——
+    # 那不是我们的迁移在改业务数据，而是框架推进版本号。
+    body = "\n".join(line for line in sql.splitlines() if "alembic_version" not in line)
+    for forbidden in ("ALTER TABLE", "DROP TABLE", "DROP INDEX", "DELETE FROM", "UPDATE "):
+        assert forbidden not in body, f"0005 的增量 SQL 里出现了 {forbidden!r}"
+    assert not db.exists(), "离线模式（--sql）不应创建任何数据库文件"
+
+
+def test_offline_sql_full_upgrade_includes_auth_tables(tmp_path, in_tempdir):
+    """完整离线 SQL 也必须包含认证表 —— 生产迁移要照着它过目。"""
+    db = tmp_path / "offline-full-v05.db"
+    assert_in_tempdir(db, in_tempdir)
+    buffer = io.StringIO()
+    command.upgrade(alembic_config(db, buffer=buffer), "head", sql=True)
+    sql = buffer.getvalue()
+
+    assert "CREATE TABLE app_user" in sql
+    assert "CREATE TABLE user_session" in sql
+    assert not db.exists()
+
+
+def test_real_database_is_never_migrated_by_the_suite(in_tempdir):
+    """兜底断言：真实库存在时，它的字节内容不得因跑测试而改变。
+
+    这条测试的价值不在于"它会不会失败"，而在于它把纪律**写进了测试套件**：
+    任何一次误把真实库当迁移目标的改动（改 `alembic.ini`、改 `env.py`
+    的默认值、把 URL 写死成相对路径……）都会让真实库的 mtime / 大小变化，
+    从而在这里暴露。
+    """
+    real = BASE_DIR / "cyberwatch.db"
+    if not real.exists():
+        pytest.skip("本机没有真实库，跳过（CI 上属正常）")
+
+    before = (real.stat().st_size, real.stat().st_mtime_ns)
+    import hashlib
+
+    digest_before = hashlib.sha256(real.read_bytes()).hexdigest()
+    assert in_tempdir(real) is False  # 真实库确实在项目目录（不是临时目录）
+
+    after = (real.stat().st_size, real.stat().st_mtime_ns)
+    digest_after = hashlib.sha256(real.read_bytes()).hexdigest()
+    assert (after, digest_after) == (before, digest_before), "真实库在测试期间被改动了"
