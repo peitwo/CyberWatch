@@ -51,21 +51,30 @@ def test_create_rejects_invalid_status(client, bad):
 
 # ---------------------------------------------------------------------------
 # 需求 3：三个状态之间可任意方向切换（含 resolved 回到 open / investigating）
+#
+# V0.4.2 起新增了「部分方向必须填写原因」的规则（investigating→resolved、
+# resolved→open/investigating）。原测试**目标不变**——仍然是「六个方向都能切换」，
+# 只是给需要原因的方向补上 reason 参数；不需要原因的方向仍然**不带 reason** 提交，
+# 因此「可选原因的方向确实可以不填」这一行为也被继续覆盖。
+# 「哪些方向必须带原因、不带会怎样」由 tests/test_status_history.py 专门覆盖。
 # ---------------------------------------------------------------------------
 @pytest.mark.parametrize(
-    "start,target",
+    "start,target,needs_reason",
     [
-        ("open", "investigating"),
-        ("open", "resolved"),
-        ("investigating", "open"),
-        ("investigating", "resolved"),
-        ("resolved", "open"),
-        ("resolved", "investigating"),
+        ("open", "investigating", False),
+        ("open", "resolved", False),
+        ("investigating", "open", False),
+        ("investigating", "resolved", True),
+        ("resolved", "open", True),
+        ("resolved", "investigating", True),
     ],
 )
-def test_status_can_transition_freely(client, start, target):
+def test_status_can_transition_freely(client, start, target, needs_reason):
     event = make_event(client, status=start)
-    response = client.patch(f"/events/{event['id']}", json={"status": target})
+    payload = {"status": target}
+    if needs_reason:
+        payload["reason"] = "状态切换（自动化测试）"
+    response = client.patch(f"/events/{event['id']}", json=payload)
     assert response.status_code == 200, response.text
     assert response.json()["status"] == target
     assert client.get(f"/events/{event['id']}").json()["status"] == target

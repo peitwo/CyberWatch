@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 from alembic import command
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 from sqlmodel import SQLModel
 
 from app.config import BASE_DIR, DATABASE_URL_ENV
@@ -24,7 +25,29 @@ MIGRATIONS_DIR = BASE_DIR / "migrations"
 ALEMBIC_INI = BASE_DIR / "alembic.ini"
 
 OLD_COLUMNS = ["title", "severity", "description", "id", "created_at"]
-NEW_COLUMNS = {"title", "severity", "status", "description", "id", "created_at"}
+# V0.4.2 起 head 的 event 表多了 deleted_at（软删除标记）
+NEW_COLUMNS = {
+    "title", "severity", "status", "description", "id", "created_at", "deleted_at",
+}
+# V0.4.2 新增的审计表结构
+HISTORY_COLUMNS = {
+    "id", "event_id", "old_status", "new_status",
+    "reason", "action", "actor_id", "changed_at",
+}
+
+
+def head_revision() -> str:
+    """当前迁移链的 head 版本号。
+
+    刻意**不写死**版本号：每次新增迁移都会推进 head，写死会让「版本记录指向 head」
+    这类断言变成维护负担（要改测试而不是改产品）。
+    """
+    cfg = Config(str(ALEMBIC_INI))
+    cfg.set_main_option("script_location", str(MIGRATIONS_DIR))
+    return ScriptDirectory.from_config(cfg).get_current_head()
+
+
+HEAD_REVISION = head_revision()
 
 # 与真实库完全相同的 3 行数据（id 与 created_at 都由我们显式指定，便于逐字段比对）
 SEED_ROWS = [
@@ -138,8 +161,8 @@ def test_migration_preserves_existing_data(tmp_path, in_tempdir):
     statuses = [row[0] for row in selects(db, "select status from event order by id")]
     assert statuses == ["open", "open", "open"]
 
-    # ⑥ 版本记录指向 head
-    assert selects(db, "select version_num from alembic_version") == [("0002",)]
+    # ⑥ 版本记录指向 head（head 会随新增迁移推进，所以用动态值而非写死 "0002"）
+    assert selects(db, "select version_num from alembic_version") == [(HEAD_REVISION,)]
 
 
 def test_migration_adds_status_column_with_server_default(tmp_path, in_tempdir):
@@ -150,7 +173,8 @@ def test_migration_adds_status_column_with_server_default(tmp_path, in_tempdir):
     seed_old_rows(db)
     command.upgrade(cfg, "head")
 
-    assert columns_of(db) == OLD_COLUMNS + ["status"]  # ADD COLUMN 只能追加到末尾
+    # 结构上 head 会在 0002 的 status 之后，追加 0003 的 deleted_at
+    assert columns_of(db) == OLD_COLUMNS + ["status", "deleted_at"]
     col_type, notnull, default = schema_by_name(db)["status"]
     assert col_type == "VARCHAR(13)"
     assert notnull == 1
@@ -192,6 +216,13 @@ def test_migrated_schema_matches_model_schema(tmp_path, in_tempdir):
     for name in sorted(model_schema):
         assert migrated_schema[name] == model_schema[name], name
 
+    # V0.4.2：审计表也要「迁移建出的结构 == 模型声明的结构」，防止两条路径漂移
+    migrated_history = schema_by_name(migrated, "status_history")
+    model_history = schema_by_name(model_db, "status_history")
+    assert set(migrated_history) == set(model_history) == HISTORY_COLUMNS
+    for name in sorted(model_history):
+        assert migrated_history[name] == model_history[name], name
+
 
 # ---------------------------------------------------------------------------
 # 3) 幂等 / 升级路径
@@ -207,7 +238,7 @@ def test_upgrade_head_is_idempotent(tmp_path, in_tempdir):
 
     command.upgrade(cfg, "head")  # 再跑一次不得报错、不得改数据
     assert selects(db, "select id,status from event order by id") == first
-    assert selects(db, "select version_num from alembic_version") == [("0002",)]
+    assert selects(db, "select version_num from alembic_version") == [(HEAD_REVISION,)]
 
 
 def test_fresh_database_upgrade_head(tmp_path, in_tempdir):
@@ -215,8 +246,12 @@ def test_fresh_database_upgrade_head(tmp_path, in_tempdir):
     assert_in_tempdir(db, in_tempdir)
     command.upgrade(alembic_config(db), "head")
     assert db.exists()
-    assert columns_of(db) == OLD_COLUMNS + ["status"]
+    assert columns_of(db) == OLD_COLUMNS + ["status", "deleted_at"]
     assert selects(db, "select count(*) from event") == [(0,)]
+    # 全新库也必须建出审计表
+    assert "status_history" in [r[1] for r in selects(
+        db, "select type,name from sqlite_master where type='table'"
+    )]
 
 
 # ---------------------------------------------------------------------------
@@ -252,7 +287,7 @@ def test_downgrade_and_reupgrade_round_trip(tmp_path, in_tempdir):
     command.downgrade(cfg, "0001")
     command.upgrade(cfg, "head")
 
-    assert columns_of(db) == OLD_COLUMNS + ["status"]
+    assert columns_of(db) == OLD_COLUMNS + ["status", "deleted_at"]
     assert [r[0] for r in selects(db, "select status from event order by id")] == [
         "open", "open", "open",
     ]
@@ -270,6 +305,10 @@ def test_offline_sql_full_upgrade(tmp_path, in_tempdir):
 
     assert "CREATE TABLE event" in sql
     assert "ALTER TABLE event ADD COLUMN status VARCHAR(13) DEFAULT 'open' NOT NULL" in sql
+    # V0.4.2：完整 SQL 还应包含软删除列与审计表
+    assert "ALTER TABLE event ADD COLUMN deleted_at DATETIME" in sql
+    assert "CREATE TABLE status_history" in sql
+    assert "FOREIGN KEY(event_id) REFERENCES event (id)" in sql
     # 离线模式不得真的碰数据库
     assert not db.exists(), "离线模式（--sql）不应创建任何数据库文件"
     # 生成的 SQL 里不得出现真实库路径
@@ -305,7 +344,7 @@ def test_env_py_respects_caller_url_and_never_falls_back_to_env_var(
 
     command.upgrade(alembic_config(caller_db), "head")
 
-    assert caller_db.exists() and columns_of(caller_db) == OLD_COLUMNS + ["status"]
+    assert caller_db.exists() and columns_of(caller_db) == OLD_COLUMNS + ["status", "deleted_at"]
     assert not decoy_db.exists(), "env.py 覆盖了调用方显式指定的 URL"
 
 
@@ -320,4 +359,100 @@ def test_env_py_uses_env_var_when_caller_gives_nothing(tmp_path, monkeypatch, in
     cfg.set_main_option("sqlalchemy.url", "")  # 与 alembic.ini 的留空一致
 
     command.upgrade(cfg, "head")
-    assert env_db.exists() and columns_of(env_db) == OLD_COLUMNS + ["status"]
+    assert env_db.exists() and columns_of(env_db) == OLD_COLUMNS + ["status", "deleted_at"]
+
+
+# ---------------------------------------------------------------------------
+# 7) V0.4.2 专门：软删除列（0003）与审计表（0004）
+# ---------------------------------------------------------------------------
+def foreign_keys_of(db_path: Path, table: str) -> list[tuple]:
+    with connect(db_path) as con:
+        return list(con.execute(f"PRAGMA foreign_key_list({table})"))
+
+
+def test_migration_0003_adds_deleted_at_nullable_and_keeps_data(tmp_path, in_tempdir):
+    """0003：加 deleted_at 列，已有行补 NULL（未归档），其余数据一字不动。"""
+    db = tmp_path / "soft-delete.db"
+    assert_in_tempdir(db, in_tempdir)
+    cfg = alembic_config(db)
+    command.upgrade(cfg, "0002")
+    seed_old_rows(db)
+    before = selects(
+        db, "select id,title,severity,description,created_at from event order by id"
+    )
+
+    command.upgrade(cfg, "0003")
+
+    assert columns_of(db) == OLD_COLUMNS + ["status", "deleted_at"]
+    after = selects(
+        db, "select id,title,severity,description,created_at from event order by id"
+    )
+    assert after == before  # 逐字段零损失
+    # 已有行全部是「未归档」；deleted_at 必须可空、无默认值
+    assert selects(db, "select deleted_at from event order by id") == [
+        (None,), (None,), (None,),
+    ]
+    col_type, notnull, default = schema_by_name(db)["deleted_at"]
+    assert notnull == 0 and default is None
+    assert selects(db, "select version_num from alembic_version") == [("0003",)]
+
+
+def test_migration_0004_creates_history_table_with_real_foreign_key(tmp_path, in_tempdir):
+    """0004：建审计表，列齐全、外键指向 event.id、迁移不写入任何审计行。"""
+    db = tmp_path / "history.db"
+    assert_in_tempdir(db, in_tempdir)
+    cfg = alembic_config(db)
+    command.upgrade(cfg, "0003")
+    seed_old_rows(db)
+
+    command.upgrade(cfg, "0004")
+
+    assert columns_of(db, "status_history") == [
+        "id", "event_id", "old_status", "new_status",
+        "reason", "action", "actor_id", "changed_at",
+    ]
+    # 外键必须是真实存在的约束（不是只写在注释里）
+    fks = foreign_keys_of(db, "status_history")
+    assert [f[2:5] for f in fks] == [("event", "event_id", "id")], fks
+    # 迁移只建表、不造数据：审计从第一次真实状态变更才开始
+    assert selects(db, "select count(*) from status_history") == [(0,)]
+    # 已有事件数据仍然完好
+    assert len(selects(db, "select id from event order by id")) == 3
+    assert selects(db, "select version_num from alembic_version") == [("0004",)]
+
+
+def test_downgrade_0004_to_0002_drops_history_then_deleted_at(tmp_path, in_tempdir):
+    """回退：先删审计表、再删 deleted_at，event 数据必须完好保留。"""
+    db = tmp_path / "down-soft.db"
+    assert_in_tempdir(db, in_tempdir)
+    cfg = alembic_config(db)
+    command.upgrade(cfg, "0002")
+    seed_old_rows(db)
+    command.upgrade(cfg, "head")
+    assert columns_of(db, "status_history")  # 确认确实建过
+
+    command.downgrade(cfg, "0002")
+
+    tables = [r[1] for r in selects(db, "select type,name from sqlite_master")]
+    assert "status_history" not in tables
+    assert columns_of(db) == OLD_COLUMNS + ["status"]
+    after = selects(
+        db, "select id,title,severity,description,created_at from event order by id"
+    )
+    assert after == [(r[0], r[1], r[2], r[3], r[4]) for r in SEED_ROWS]
+    assert selects(db, "select version_num from alembic_version") == [("0002",)]
+
+
+def test_offline_sql_incremental_0003_to_0004(tmp_path, in_tempdir):
+    """本轮增量 SQL 必须能先过目：只含建审计表，不含 ALTER event。"""
+    db = tmp_path / "offline-0404.db"
+    assert_in_tempdir(db, in_tempdir)
+    buffer = io.StringIO()
+    command.upgrade(alembic_config(db, buffer=buffer), "0003:0004", sql=True)
+    sql = buffer.getvalue()
+
+    assert "CREATE TABLE status_history" in sql
+    assert "FOREIGN KEY(event_id) REFERENCES event (id)" in sql
+    assert "CREATE INDEX ix_status_history_event_id" in sql
+    assert "ALTER TABLE event" not in sql, "增量 SQL 不应改动 event 表"
+    assert not db.exists()

@@ -9,6 +9,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from sqlalchemy import Engine, event
+
 # app/config.py -> app/ -> cyberwatch-starter/
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -53,3 +55,28 @@ def sqlite_file_path(url: str) -> Path | None:
     if not raw or raw.startswith(":memory:"):
         return None
     return Path(raw)
+
+
+def enable_sqlite_foreign_keys(engine: Engine) -> None:
+    """让 SQLite 引擎**真正强制**外键约束。
+
+    背景：SQLite 出于向后兼容，默认 **不** 校验外键。``PRAGMA foreign_keys``
+    是「按连接」生效的开关，因此必须在**每次新建连接**时打开，
+    而不是在引擎上设置一次。
+
+    做法：给引擎挂一个 ``connect`` 事件监听器，SQLAlchemy 每次从连接池
+    新建底层连接时都会执行 ``PRAGMA foreign_keys=ON``。
+
+    这样 ``status_history.event_id`` 对 ``event.id`` 的外键才是**真实生效**的约束，
+    而不是只写在 DDL 里的装饰。非 SQLite 后端直接跳过（PostgreSQL 等默认就强制）。
+    """
+    if engine.url.get_backend_name() != "sqlite":
+        return
+
+    @event.listens_for(engine, "connect")
+    def _set_sqlite_foreign_keys(dbapi_connection, _connection_record) -> None:
+        cursor = dbapi_connection.cursor()
+        try:
+            cursor.execute("PRAGMA foreign_keys=ON")
+        finally:
+            cursor.close()
